@@ -1,0 +1,6 @@
+fastapi==0.162.2
+uvicorn[standard]
+anthropic==2.6.0
+kokoro-onnx
+soundfile
+numpy

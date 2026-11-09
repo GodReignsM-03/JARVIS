@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#03070d">
+  <title>JARVIS</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <div id="hud">
+    <header>
+      <span class="brand">J.A.R.V.I.S.</span>
+      <span id="status" class="status">offline</span>
+    </header>
+
+    <aside id="left" class="panel">
+      <h2>System</h2>
+      <dl>
+        <dt>Brain</dt><dd id="d-model">—</dd>
+        <dt>Voice</dt><dd id="d-voice">—</dd>
+        <dt>Mode</dt><dd id="d-mode">Tap to talk</dd>
+      </dl>
+    </aside>
+
+    <main>
+      <canvas id="orb" aria-label="Jarvis"></canvas>
+      <div id="caption-you" class="caption you"></div>
+      <div id="caption-jarvis" class="caption jarvis"></div>
+    </main>
+
+    <aside id="right" class="panel">
+      <h2>Last response</h2>
+      <dl>
+        <dt>First words</dt><dd id="m-first">—</dd>
+        <dt>Total</dt><dd id="m-total">—</dd>
+        <dt>Tokens in / out</dt><dd id="m-tokens">—</dd>
+        <dt>Cached</dt><dd id="m-cache">—</dd>
+      </dl>
+      <p class="note">Calendar, tasks and memory arrive in phase 1.</p>
+    </aside>
+
+    <footer>
+      <button id="wake-toggle" class="chip" aria-pressed="false">“Hey Jarvis” off</button>
+      <form id="type-form" autocomplete="off">
+        <input id="type-input" placeholder="Type instead…" maxlength="500">
+      </form>
+    </footer>
+  </div>
+
+  <div id="boot" role="button" tabindex="0">
+    <div class="boot-inner">
+      <div class="boot-title">J.A.R.V.I.S.</div>
+      <div class="boot-sub">Tap to wake</div>
+    </div>
+  </div>
+
+  <script src="/orb.js"></script>
+  <script src="/app.js"></script>
+</body>
+</html>
