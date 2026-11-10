@@ -6,7 +6,7 @@ set -euo pipefail
 C="${OCI_TENANCY:?Run this in Oracle Cloud Shell}"
 echo "== Jarvis server setup =="
 
-[ -f ~/.ssh/jarvis ] || ssh-keygen -t ed25519 -N "" -f ~/.ssh/jarvis -q
+[ -f ~/.ssh/jarvis ] || ssh-keygen -t rsa -b 4096 -N "" -f ~/.ssh/jarvis -q
 echo "SSH key ready"
 
 VCN=$(oci network vcn create --compartment-id "$C" --cidr-blocks '["10.0.0.0/16"]' \
