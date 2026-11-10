@@ -15,7 +15,7 @@ html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
   -webkit-tap-highlight-color: transparent; }
 
 #hud { height: 100%; display: grid;
-  grid-template: "head head head" auto "left main right" 1fr "foot foot foot" auto / 240px 1fr 240px;
+  grid-template: "head head head" auto "left main right" 1fr "foot foot foot" auto / 240px 1fr 300px;
   padding: max(12px, env(safe-area-inset-top)) 16px max(12px, env(safe-area-inset-bottom)); gap: 12px; }
 
 header { grid-area: head; display: flex; justify-content: space-between; align-items: center;

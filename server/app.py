@@ -1,6 +1,7 @@
 """Jarvis web server (phase 0). Serves ONLY the web/ folder plus the /api routes."""
 import asyncio
 import json
+import time
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
@@ -59,11 +60,13 @@ async def _json_body(request: Request) -> dict:
 async def tts(request: Request):
     body = await _json_body(request)
     tone = str(body.get("tone", voice.DEFAULT_TONE))
+    t0 = time.monotonic()
     try:
         audio = await asyncio.to_thread(voice.speak, body["text"], tone)
     except RuntimeError as e:
         return JSONResponse({"error": str(e)}, status_code=503)
-    return Response(audio, media_type="audio/mpeg")
+    ms = int((time.monotonic() - t0) * 1000)
+    return Response(audio, media_type="audio/mpeg", headers={"X-TTS-ms": str(ms)})
 
 
 @app.post("/api/chat")
@@ -97,6 +100,7 @@ async def static(path: str):
 
 @app.on_event("startup")
 async def warm_up():
+    await brain.warm_up()
     # Load the voice and pre-render the greeting so the first words are instant.
     if await asyncio.to_thread(voice.load):
         for line in ["Hello, sir.", "One moment, sir.", "Right away, sir.", "Just a moment."]:

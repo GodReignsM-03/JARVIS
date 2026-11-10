@@ -55,6 +55,24 @@ def _split_ready(buf: str) -> tuple[list[str], str]:
     return out, buf
 
 
+_CLAUSE = re.compile(r"^(.{25,}?[,;:—])\s+(.*)$", re.S)
+
+
+def _first_clause(buf: str) -> tuple[str, str]:
+    """A first clause long enough to sound natural on its own (e.g. 'I'd suggest the salmon tonight,')."""
+    m = _CLAUSE.match(buf)
+    return (m.group(1).strip(), m.group(2)) if m else ("", buf)
+
+
+async def warm_up() -> None:
+    """Open the connection to the AI service ahead of time so the first question doesn't pay for it."""
+    if config.brain_configured():
+        try:
+            await client().models.list(limit=1)
+        except Exception:
+            pass
+
+
 async def chat(session: str, text: str) -> AsyncIterator[dict]:
     """Yield events: {"type":"sentence","text":...}, then {"type":"done", ...} or {"type":"error", ...}."""
     if config.MODEL not in config.KNOWN_MODELS:
@@ -96,6 +114,11 @@ async def chat(session: str, text: str) -> AsyncIterator[dict]:
             async for chunk in stream.text_stream:
                 buf += chunk
                 ready, buf = _split_ready(buf)
+                # Speed: don't wait for the whole first sentence if a natural clause is ready.
+                if first_sentence_at is None and not ready:
+                    clause, rest = _first_clause(buf)
+                    if clause:
+                        ready, buf = [clause], rest
                 for s in ready:
                     if first_sentence_at is None:
                         first_sentence_at = time.monotonic() - started

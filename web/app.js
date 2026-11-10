@@ -2,7 +2,7 @@
 // ---------------------------------------------------------------------------
 // FINISH_MS: how long a pause must last before Jarvis treats your sentence as finished.
 // Too low cuts you off mid-thought; too high feels sluggish. Tune after a day of real use.
-const FINISH_MS = 900;
+const FINISH_MS = 700;
 const FOLLOW_UP_MS = 8000;   // after Jarvis answers, you can reply without saying "Jarvis" again
 const WAKE = /\b(?:hey|hi|ok|okay)?\s*,?\s*jarvis\b[\s,.!?]*/i;
 const INTERRUPT = /\b(stop|wait|hold on|jarvis|enough|quiet)\b/i;
@@ -22,6 +22,8 @@ let recog = null, recogOn = false, recogWanted = false;
 let heard = "", finishTimer = null;
 let gen = 0;                  // bumps on every interrupt; stale audio/requests are dropped
 let chatAbort = null, currentSource = null, playQueue = Promise.resolve();
+let lastHeardAt = 0;          // last moment speech recognition gave us words
+let timing = null;            // per-question stopwatch
 
 // ---------- UI helpers ----------
 function setPhase(p, label) {
@@ -42,6 +44,7 @@ async function fetchSpeech(text, myGen) {
   const r = await fetch("/api/tts", { method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ text }) });
   if (!r.ok) throw new Error("voice unavailable");
+  if (timing && timing.gen === myGen && timing.ttsMs == null) timing.ttsMs = +r.headers.get("X-TTS-ms") || 0;
   const buf = await r.arrayBuffer();
   if (myGen !== gen) return null;
   return audioCtx.decodeAudioData(buf);
@@ -57,6 +60,7 @@ function playBuffer(buffer, myGen) {
     src.onended = () => { if (currentSource === src) currentSource = null; resolve(); };
     setPhase("speaking");
     src.start();
+    if (timing && timing.gen === myGen && timing.brainAt && !timing.voiceAt) { timing.voiceAt = performance.now(); showTiming(); }
   });
 }
 
@@ -75,6 +79,16 @@ function interrupt() {
   if (currentSource) { try { currentSource.stop(); } catch (_) {} currentSource = null; }
   playQueue = Promise.resolve();
   Orb.setLevel(0);
+}
+
+// Stopwatch: from the moment you stopped talking to the moment Jarvis's voice starts.
+function showTiming() {
+  const t = timing, f = (ms) => (ms / 1000).toFixed(2) + " s";
+  if (!t || !t.voiceAt) return;
+  $("m-total").textContent = f(t.voiceAt - t.heardAt);
+  $("m-pause").textContent = f(t.sentAt - t.heardAt);
+  $("m-brain").textContent = t.brainAt ? f(t.brainAt - t.sentAt) : "—";
+  $("m-voice").textContent = t.brainAt ? f(t.voiceAt - t.brainAt) + (t.ttsMs != null ? " (" + f(t.ttsMs) + " making audio)" : "") : "—";
 }
 
 // A soft two-note chime the instant he hears you, so there's never dead air.
@@ -105,9 +119,10 @@ function meter() {
 }
 
 // ---------- Talking to the brain ----------
-async function ask(text) {
+async function ask(text, heardAt) {
   interrupt();
   const myGen = gen;
+  timing = { gen: myGen, heardAt: heardAt || performance.now(), sentAt: performance.now() };
   captionYou(text);
   captionJarvis("");
   setPhase("thinking");
@@ -135,6 +150,7 @@ async function ask(text) {
         if (!line.trim() || myGen !== gen) continue;
         const ev = JSON.parse(line);
         if (ev.type === "sentence") {
+          if (!gotAny && timing && timing.gen === myGen) timing.brainAt = performance.now();
           gotAny = true;
           clearTimeout(filler);
           captionJarvis(ev.text, true);
@@ -144,8 +160,6 @@ async function ask(text) {
           setPhase("error", "error");
           say(ev.message, myGen);
         } else if (ev.type === "done") {
-          $("m-first").textContent = ev.first_sentence_s + " s";
-          $("m-total").textContent = ev.total_s + " s";
           $("m-tokens").textContent = ev.usage.input + " / " + ev.usage.output;
           $("m-cache").textContent = ev.usage.cache_read + " read";
         }
@@ -186,6 +200,7 @@ function setupRecognition() {
       if (e.results[i].isFinal) finals += t + " "; else interim += t;
     }
     const live = (finals + interim).trim();
+    if (live) lastHeardAt = performance.now();
 
     // While Jarvis talks, only interrupt words count (his own voice can leak into the mic).
     if (phase === "speaking" || phase === "thinking") {
@@ -209,7 +224,7 @@ function setupRecognition() {
       heard = "";
       if (!text) return;
       if (mode === "tap") stopListening();
-      ask(text);
+      ask(text, lastHeardAt);
     }, FINISH_MS);
   };
   recog.onend = () => { recogOn = false; if (recogWanted) startRecog(); };
