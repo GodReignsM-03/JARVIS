@@ -19,6 +19,18 @@
 >    - Phase 2 budget decided later
 > 6. **Cross Spur launch:** handled in a separate project. Jarvis gets a Cross Spur workspace (tasks, ideas) in phase 2 [C].
 > 7. **Filming:** Jarvis may appear in your videos (e.g., a morning routine), so the orb and voice must look and sound good on camera. Staged-call tools are deferred [C].
+> 9. **Fitness and nutrition moved up to phase 1b** [C]. It reuses phase 1's voice logging, memory and reminders.
+>    - **Workouts by voice:** exercises, sets, reps, weight
+>      - Progress tracking, with flags when lifts stall
+>      - Reminders built from your training split
+>    - **Calories and protein by voice, no Apple Health:**
+>      - Jarvis estimates from your description
+>      - Saved "usual" meals give exact numbers
+>      - Daily targets for a lean bulk (small calorie surplus, protein goal)
+>      - Note: voice estimates are approximate; staples and labels make them precise
+>    - **Body weight:** quick voice log and weekly trend, checked against the lean-bulk gain rate, with a nudge if you're gaining too fast or too slow
+>    - **Small trackers added as we go:** each is a short addition once the core exists
+>
 > 8. **The 18-prompt pack, adopted as sorted** [C]:
 >    - **Phase 0:** persona block (4), end-of-thought pause setting (FINISH_MS) and interrupts (2), preflight checks where "done" means preflight passed (7)
 >    - **Phase 1:** voice capture (5), restart-safe reminders (15), Google Calendar with receipts and email treated as data (10), source cards (3), security lockdown rewritten for an internet-facing server (18)
