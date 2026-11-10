@@ -6,7 +6,7 @@ from typing import AsyncIterator
 
 import anthropic
 
-from . import config
+from . import config, spend
 
 VOICE_RULES = """
 ## Speaking rules (you are heard, not read)
@@ -31,6 +31,7 @@ _history: dict[str, list[dict]] = defaultdict(list)
 MAX_TURNS = 12
 
 _client: anthropic.AsyncAnthropic | None = None
+_fast_ok = True  # flips off if the account doesn't have fast mode
 
 
 def client() -> anthropic.AsyncAnthropic:
@@ -75,6 +76,7 @@ async def warm_up() -> None:
 
 async def chat(session: str, text: str) -> AsyncIterator[dict]:
     """Yield events: {"type":"sentence","text":...}, then {"type":"done", ...} or {"type":"error", ...}."""
+    global _fast_ok
     if config.MODEL not in config.KNOWN_MODELS:
         yield {"type": "error", "message": f"Unknown model '{config.MODEL}'. I have: {sorted(config.KNOWN_MODELS)}"}
         return
@@ -88,22 +90,17 @@ async def chat(session: str, text: str) -> AsyncIterator[dict]:
     first_sentence_at = None
     spoken: list[str] = []
     buf = ""
+    use_fast = config.FAST and _fast_ok and spend.fast_allowed()
     try:
         kwargs = dict(
             model=config.MODEL,
             max_tokens=4000,  # covers thinking + the short spoken answer
             system=[{"type": "text", "text": SYSTEM, "cache_control": {"type": "ephemeral"}}],
-            output_config={"effort": config.EFFORT_CHAT},
+            output_config={"effort": config.EFFORT_CHAT},  # Opus 5.5 always thinks; "low" = least thinking
             messages=messages,
         )
-        # Per-model speed settings. Opus 5.5 always thinks (effort is the only dial);
-        # Sonnet 5.5 can skip thinking with "between_tools"; Haiku 5.5 can disable it.
-        if config.MODEL == "claude-sonnet-5-5":
-            kwargs["thinking"] = {"type": "between_tools"}
-        elif config.MODEL == "claude-haiku-5-5":
-            kwargs["thinking"] = {"type": "disabled"}
-        if config.FAST and config.MODEL == "claude-opus-5-5":
-            # Fast mode: same Opus, up to ~2.5x faster output, at 2x the price.
+        if use_fast:
+            # Fast mode: the same Opus 5.5, generating up to ~2.5x faster (thinking included), at 2x price.
             streamer = client().beta.messages.stream(speed="fast", betas=["fast-mode-2026-02-01"], **kwargs)
         else:
             streamer = client().messages.stream(**kwargs)
@@ -148,8 +145,17 @@ async def chat(session: str, text: str) -> AsyncIterator[dict]:
         del history[: max(0, len(history) - MAX_TURNS * 2)]
 
         u = final.usage
+        usage = {
+            "input": u.input_tokens,
+            "output": u.output_tokens,
+            "cache_read": getattr(u, "cache_read_input_tokens", 0) or 0,
+            "cache_write": getattr(u, "cache_creation_input_tokens", 0) or 0,
+        }
+        month_usd = spend.record(usage, use_fast)
         yield {
             "type": "done",
+            "fast": use_fast,
+            "month_usd": round(month_usd, 2),
             "first_sentence_s": round(first_sentence_at or 0, 2),
             "total_s": round(time.monotonic() - started, 2),
             "usage": {
@@ -159,6 +165,15 @@ async def chat(session: str, text: str) -> AsyncIterator[dict]:
                 "cache_write": getattr(u, "cache_creation_input_tokens", 0) or 0,
             },
         }
+    except (anthropic.BadRequestError, anthropic.PermissionDeniedError, anthropic.NotFoundError) as e:
+        if use_fast and not spoken:
+            _fast_ok = False
+            print(f"[brain] fast mode unavailable ({e.status_code}: {e.message}); using standard Opus", flush=True)
+            async for ev in chat(session, text):
+                yield ev
+            return
+        print(f"[brain] API error {e.status_code}: {e.message}", flush=True)
+        yield {"type": "error", "message": f"The AI service returned an error ({e.status_code}), sir. Details are in the server window."}
     except anthropic.AuthenticationError:
         yield {"type": "error", "message": "My API key was refused, sir. It may be wrong or revoked."}
     except anthropic.RateLimitError:

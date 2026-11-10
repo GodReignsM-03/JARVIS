@@ -23,10 +23,10 @@ def _load_dotenv() -> None:
 _load_dotenv()
 
 # Exact model ids Jarvis is allowed to use. A name that isn't here is refused, never guessed.
-KNOWN_MODELS = {"claude-opus-5-5", "claude-sonnet-5-5", "claude-haiku-5-5"}
+KNOWN_MODELS = {"claude-opus-5-5"}  # Jarvis runs on Opus 5.5 only (owner's decision)
 MODEL = os.environ.get("JARVIS_MODEL", "claude-opus-5-5")
 EFFORT_CHAT = os.environ.get("JARVIS_EFFORT", "low")  # casual voice chat: low effort = faster, cheaper
-FAST = os.environ.get("JARVIS_FAST", "0") == "1"      # Opus fast mode: faster replies, 2x price
+FAST = os.environ.get("JARVIS_FAST", "0") == "1"      # Opus fast mode: OFF by default (2x price). Set JARVIS_FAST=1 to opt in; spend guard turns it off near the cap
 
 HOST = os.environ.get("JARVIS_HOST", "127.0.0.1")
 PORT = int(os.environ.get("JARVIS_PORT", "4700"))

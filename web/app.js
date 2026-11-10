@@ -2,11 +2,12 @@
 // ---------------------------------------------------------------------------
 // FINISH_MS: how long a pause must last before Jarvis treats your sentence as finished.
 // Too low cuts you off mid-thought; too high feels sluggish. Tune after a day of real use.
-const FINISH_MS = 700;
+const FINISH_MS = 700;   // pause after unconfirmed words
+const FINAL_MS = 350;    // shorter pause once the browser has confirmed the phrase is finished
 const FOLLOW_UP_MS = 8000;   // after Jarvis answers, you can reply without saying "Jarvis" again
 const WAKE = /\b(?:hey|hi|ok|okay)?\s*,?\s*jarvis\b[\s,.!?]*/i;
 const INTERRUPT = /\b(stop|wait|hold on|jarvis|enough|quiet)\b/i;
-const FILLER_MS = 1800;      // if he hasn't started answering by now, he acknowledges you
+const FILLER_MS = 1500;      // if he hasn't started answering by now, he acknowledges you
 const FILLERS = ["One moment, sir.", "Right away, sir.", "Just a moment."];
 // ---------------------------------------------------------------------------
 
@@ -162,6 +163,7 @@ async function ask(text, heardAt) {
         } else if (ev.type === "done") {
           $("m-tokens").textContent = ev.usage.input + " / " + ev.usage.output;
           $("m-cache").textContent = ev.usage.cache_read + " read";
+          $("m-spend").textContent = "$" + ev.month_usd.toFixed(2) + (ev.fast ? " · fast" : "");
         }
       }
     }
@@ -225,7 +227,7 @@ function setupRecognition() {
       if (!text) return;
       if (mode === "tap") stopListening();
       ask(text, lastHeardAt);
-    }, FINISH_MS);
+    }, finals.trim() && !interim ? FINAL_MS : FINISH_MS);
   };
   recog.onend = () => { recogOn = false; if (recogWanted) startRecog(); };
   recog.onerror = (e) => {
