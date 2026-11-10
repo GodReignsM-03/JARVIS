@@ -18,7 +18,15 @@ def get(url: str, dest: Path) -> None:
         return
     print(f"  downloading {dest.name} ...", flush=True)
     tmp = dest.with_suffix(dest.suffix + ".part")
-    urllib.request.urlretrieve(url, tmp)
+
+    def progress(blocks: int, block_size: int, total: int) -> None:
+        done = blocks * block_size
+        if total > 0:
+            pct = min(100, done * 100 // total)
+            print(f"\r    {done // 1_048_576} / {total // 1_048_576} MB ({pct}%)", end="", flush=True)
+
+    urllib.request.urlretrieve(url, tmp, reporthook=progress)
+    print()
     tmp.replace(dest)
 
 
