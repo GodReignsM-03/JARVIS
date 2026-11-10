@@ -119,7 +119,8 @@ async def chat(session: str, text: str) -> AsyncIterator[dict]:
     except anthropic.RateLimitError:
         yield {"type": "error", "message": "I'm being rate limited, sir. Give me a moment."}
     except anthropic.APIStatusError as e:
-        yield {"type": "error", "message": f"The AI service returned an error ({e.status_code})."}
+        print(f"[brain] API error {e.status_code}: {e.message}", flush=True)  # visible in the server window
+        yield {"type": "error", "message": f"The AI service returned an error ({e.status_code}), sir. Details are in the server window."}
     except anthropic.APIConnectionError:
         yield {"type": "error", "message": "I can't reach the AI service, sir. The connection seems to be down."}
 
