@@ -71,13 +71,25 @@ async def chat(session: str, text: str) -> AsyncIterator[dict]:
     spoken: list[str] = []
     buf = ""
     try:
-        async with client().messages.stream(
+        kwargs = dict(
             model=config.MODEL,
             max_tokens=4000,  # covers thinking + the short spoken answer
             system=[{"type": "text", "text": SYSTEM, "cache_control": {"type": "ephemeral"}}],
             output_config={"effort": config.EFFORT_CHAT},
             messages=messages,
-        ) as stream:
+        )
+        # Per-model speed settings. Opus 5.5 always thinks (effort is the only dial);
+        # Sonnet 5.5 can skip thinking with "between_tools"; Haiku 5.5 can disable it.
+        if config.MODEL == "claude-sonnet-5-5":
+            kwargs["thinking"] = {"type": "between_tools"}
+        elif config.MODEL == "claude-haiku-5-5":
+            kwargs["thinking"] = {"type": "disabled"}
+        if config.FAST and config.MODEL == "claude-opus-5-5":
+            # Fast mode: same Opus, up to ~2.5x faster output, at 2x the price.
+            streamer = client().beta.messages.stream(speed="fast", betas=["fast-mode-2026-02-01"], **kwargs)
+        else:
+            streamer = client().messages.stream(**kwargs)
+        async with streamer as stream:
             # First sentence goes out alone (fast start); later sentences are grouped into
             # ~150-character chunks so the voice flows in natural phrases instead of stop-start.
             pending = ""

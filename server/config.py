@@ -26,6 +26,7 @@ _load_dotenv()
 KNOWN_MODELS = {"claude-opus-5-5", "claude-sonnet-5-5", "claude-haiku-5-5"}
 MODEL = os.environ.get("JARVIS_MODEL", "claude-opus-5-5")
 EFFORT_CHAT = os.environ.get("JARVIS_EFFORT", "low")  # casual voice chat: low effort = faster, cheaper
+FAST = os.environ.get("JARVIS_FAST", "0") == "1"      # Opus fast mode: faster replies, 2x price
 
 HOST = os.environ.get("JARVIS_HOST", "127.0.0.1")
 PORT = int(os.environ.get("JARVIS_PORT", "4700"))

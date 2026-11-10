@@ -6,6 +6,8 @@ const FINISH_MS = 900;
 const FOLLOW_UP_MS = 8000;   // after Jarvis answers, you can reply without saying "Jarvis" again
 const WAKE = /\b(?:hey|hi|ok|okay)?\s*,?\s*jarvis\b[\s,.!?]*/i;
 const INTERRUPT = /\b(stop|wait|hold on|jarvis|enough|quiet)\b/i;
+const FILLER_MS = 1800;      // if he hasn't started answering by now, he acknowledges you
+const FILLERS = ["One moment, sir.", "Right away, sir.", "Just a moment."];
 // ---------------------------------------------------------------------------
 
 const MUTE = new URLSearchParams(location.search).get("mute") === "1";
@@ -75,6 +77,21 @@ function interrupt() {
   Orb.setLevel(0);
 }
 
+// A soft two-note chime the instant he hears you, so there's never dead air.
+function chime() {
+  if (MUTE || !audioCtx) return;
+  const t = audioCtx.currentTime;
+  [[880, 0], [1320, 0.09]].forEach(([f, d]) => {
+    const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+    o.type = "sine"; o.frequency.value = f;
+    g.gain.setValueAtTime(0, t + d);
+    g.gain.linearRampToValueAtTime(0.06, t + d + 0.015);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + d + 0.22);
+    o.connect(g); g.connect(audioCtx.destination);
+    o.start(t + d); o.stop(t + d + 0.25);
+  });
+}
+
 // Feed Jarvis's voice level into the orb.
 function meter() {
   if (analyser) {
@@ -94,8 +111,12 @@ async function ask(text) {
   captionYou(text);
   captionJarvis("");
   setPhase("thinking");
+  chime();
   chatAbort = new AbortController();
   let gotAny = false;
+  const filler = setTimeout(() => {
+    if (!gotAny && myGen === gen) say(FILLERS[Math.floor(Math.random() * FILLERS.length)], myGen);
+  }, FILLER_MS);
   try {
     const r = await fetch("/api/chat", { method: "POST", signal: chatAbort.signal,
       headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text, session: SESSION }) });
@@ -115,6 +136,7 @@ async function ask(text) {
         const ev = JSON.parse(line);
         if (ev.type === "sentence") {
           gotAny = true;
+          clearTimeout(filler);
           captionJarvis(ev.text, true);
           say(ev.text, myGen);
         } else if (ev.type === "error") {
@@ -130,6 +152,7 @@ async function ask(text) {
       }
     }
   } catch (e) {
+    clearTimeout(filler);
     if (e.name === "AbortError") return;
     captionJarvis("I can't reach my server, sir.");
     setPhase("error", "offline");
@@ -208,14 +231,17 @@ $("orb").addEventListener("click", () => {
   if (phase === "listening") { stopListening(); afterTurn(); } else startListening();
 });
 
-$("wake-toggle").addEventListener("click", (e) => {
-  mode = mode === "wake" ? "tap" : "wake";
-  e.target.setAttribute("aria-pressed", mode === "wake");
-  e.target.textContent = mode === "wake" ? "“Hey Jarvis” on" : "“Hey Jarvis” off";
-  $("d-mode").textContent = mode === "wake" ? "Hey Jarvis (while open)" : "Tap to talk";
-  if (mode === "wake") { recogWanted = true; startRecog(); setPhase("idle", "say “Jarvis”"); }
+function setMode(m) {
+  mode = m;
+  try { localStorage.setItem("jarvis.mode", m); } catch (_) {}
+  const b = $("wake-toggle");
+  b.setAttribute("aria-pressed", m === "wake");
+  b.textContent = m === "wake" ? "“Hey Jarvis” on" : "“Hey Jarvis” off";
+  $("d-mode").textContent = m === "wake" ? "Hey Jarvis (while open)" : "Tap to talk";
+  if (m === "wake") { recogWanted = true; startRecog(); setPhase("idle", "say “Jarvis”"); }
   else { recogWanted = false; if (recog) recog.stop(); setPhase("idle", "tap the orb"); }
-});
+}
+$("wake-toggle").addEventListener("click", () => setMode(mode === "wake" ? "tap" : "wake"));
 
 $("type-form").addEventListener("submit", (e) => {
   e.preventDefault();
@@ -236,11 +262,13 @@ async function boot() {
   setupRecognition();
   try {
     const h = await (await fetch("/api/health")).json();
-    $("d-model").textContent = h.brain_configured ? h.model : h.model + " (no key)";
+    $("d-model").textContent = (h.brain_configured ? h.model : h.model + " (no key)") + (h.fast ? " · fast" : "");
     $("d-voice").textContent = h.voice_loaded ? "Jarvis H · AI 2.5" : "not installed";
   } catch (_) { $("d-model").textContent = "server offline"; }
   captionJarvis("Hello, sir.");
   await say("Hello, sir.");
-  afterTurn();
+  let saved = "wake";
+  try { saved = localStorage.getItem("jarvis.mode") || "wake"; } catch (_) {}
+  setMode(recog ? saved : "tap");   // "Hey Jarvis" is on by default
 }
 $("boot").addEventListener("click", boot, { once: true });

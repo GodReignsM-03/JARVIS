@@ -36,6 +36,7 @@ async def health():
         "model_known": config.MODEL in config.KNOWN_MODELS,
         "brain_configured": config.brain_configured(),
         "voice_loaded": voice.loaded(),
+        "fast": config.FAST,
     }
 
 
@@ -98,4 +99,5 @@ async def static(path: str):
 async def warm_up():
     # Load the voice and pre-render the greeting so the first words are instant.
     if await asyncio.to_thread(voice.load):
-        await asyncio.to_thread(voice.speak, "Hello, sir.")
+        for line in ["Hello, sir.", "One moment, sir.", "Right away, sir.", "Just a moment."]:
+            await asyncio.to_thread(voice.speak, line)
