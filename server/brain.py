@@ -78,20 +78,30 @@ async def chat(session: str, text: str) -> AsyncIterator[dict]:
             output_config={"effort": config.EFFORT_CHAT},
             messages=messages,
         ) as stream:
+            # First sentence goes out alone (fast start); later sentences are grouped into
+            # ~150-character chunks so the voice flows in natural phrases instead of stop-start.
+            pending = ""
             async for chunk in stream.text_stream:
                 buf += chunk
                 ready, buf = _split_ready(buf)
                 for s in ready:
                     if first_sentence_at is None:
                         first_sentence_at = time.monotonic() - started
-                    spoken.append(s)
-                    yield {"type": "sentence", "text": s}
+                        spoken.append(s)
+                        yield {"type": "sentence", "text": s}
+                        continue
+                    pending = f"{pending} {s}".strip()
+                    if len(pending) >= 150:
+                        spoken.append(pending)
+                        yield {"type": "sentence", "text": pending}
+                        pending = ""
             final = await stream.get_final_message()
-        if buf.strip():
+        tail = f"{pending} {buf}".strip()
+        if tail:
             if first_sentence_at is None:
                 first_sentence_at = time.monotonic() - started
-            spoken.append(buf.strip())
-            yield {"type": "sentence", "text": buf.strip()}
+            spoken.append(tail)
+            yield {"type": "sentence", "text": tail}
 
         if final.stop_reason == "refusal":
             yield {"type": "error", "message": "I'm afraid I can't help with that one, sir."}

@@ -9,19 +9,19 @@ import soundfile as sf
 from . import config
 
 BLEND = {"bm_daniel": 0.85, "bm_george": 0.15}
-SPEED = 0.88
+SPEED = float(__import__("os").environ.get("JARVIS_VOICE_SPEED", "0.95"))  # approved 0.88 for dramatic lines; 0.95 for conversation
 FILTERS = {
     "2": "highpass=f=90,equalizer=f=250:t=q:w=1:g=2,equalizer=f=3000:t=q:w=1.2:g=4,"
          "acompressor=threshold=-20dB:ratio=3:attack=3:release=60:makeup=3,"
-         "chorus=0.8:0.9:22:0.3:0.5:1.5,aecho=0.8:0.7:22|37:0.18|0.1,loudnorm=I=-13",
+         "chorus=0.8:0.9:22:0.3:0.5:1.5,aecho=0.8:0.7:22|37:0.18|0.1,volume=10.8dB,alimiter=limit=0.95",
     "2.5": "highpass=f=90,equalizer=f=250:t=q:w=1:g=2,equalizer=f=3000:t=q:w=1.2:g=4,"
            "acompressor=threshold=-20dB:ratio=3:attack=3:release=60:makeup=3,"
            "flanger=delay=1:depth=1.2:regen=5:width=25:speed=0.25,chorus=0.8:0.9:22:0.32:0.5:1.6,"
-           "aecho=0.8:0.7:22|37:0.2|0.11,loudnorm=I=-13",
+           "aecho=0.8:0.7:22|37:0.2|0.11,volume=10.8dB,alimiter=limit=0.95",
     "3": "highpass=f=90,equalizer=f=250:t=q:w=1:g=2,equalizer=f=3000:t=q:w=1.2:g=4,"
          "acompressor=threshold=-20dB:ratio=3:attack=3:release=60:makeup=3,"
          "flanger=delay=1:depth=1.5:regen=10:width=45:speed=0.25,chorus=0.8:0.9:22:0.35:0.5:1.8,"
-         "aecho=0.8:0.7:22|37:0.22|0.12,loudnorm=I=-13",
+         "aecho=0.8:0.7:22|37:0.22|0.12,volume=10.8dB,alimiter=limit=0.95",
 }
 DEFAULT_TONE = "2.5"
 
@@ -55,7 +55,7 @@ def speak(text: str, tone: str = DEFAULT_TONE) -> bytes:
         raise RuntimeError("voice model not installed")
     audio, sr = _engine.create(text, voice=_style, speed=SPEED, lang="en-gb")
     # Short lead-in silence keeps the compressor/echo from clipping the first syllable.
-    audio = np.concatenate([np.zeros(int(0.05 * sr), dtype=audio.dtype), audio])
+    audio = np.concatenate([np.zeros(int(0.03 * sr), dtype=audio.dtype), audio])
     wav = io.BytesIO()
     sf.write(wav, audio, sr, format="WAV")
     proc = subprocess.run(
