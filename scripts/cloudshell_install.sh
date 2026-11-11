@@ -8,12 +8,12 @@ IP=$(oci compute instance list-vnics --instance-id "$INST" --query 'data[0]."pub
 echo "Server found at $IP"
 
 RAW="https://raw.githubusercontent.com/GodReignsM-03/JARVIS/phase-0/scripts/server_install.sh"
-TOKEN=""
-if ! curl -fsS "$RAW" -o /tmp/server_install.sh 2>/dev/null; then
-  echo "The GitHub repository is private, so the server needs a read-only GitHub token."
-  read -rsp "Paste the token (hidden) and press Enter: " TOKEN; echo
-  curl -fsS -H "Authorization: token $TOKEN" "$RAW" -o /tmp/server_install.sh
+TOKEN="${GH_TOKEN:-}"
+if [ -z "$TOKEN" ]; then
+  read -rsp "Paste your read-only GitHub token (hidden) and press Enter: " TOKEN; echo
 fi
+curl -fsS -H "Authorization: token $TOKEN" "$RAW" -o /tmp/server_install.sh \
+  || { echo "GitHub refused that token. Check it has Contents: Read-only on the JARVIS repo."; exit 1; }
 
 SSH="ssh -i $HOME/.ssh/jarvis -o StrictHostKeyChecking=accept-new -o ConnectTimeout=10"
 echo "Waiting for the server to accept connections..."
