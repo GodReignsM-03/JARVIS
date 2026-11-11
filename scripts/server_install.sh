@@ -62,8 +62,26 @@ RestartSec=3
 [Install]
 WantedBy=multi-user.target
 UNIT
+sudo tee /etc/systemd/system/jarvis-update.service >/dev/null <<UNIT
+[Unit]
+Description=Jarvis auto-update
+[Service]
+Type=oneshot
+User=$USER
+ExecStart=$HOME/jarvis/scripts/server_update.sh
+UNIT
+sudo tee /etc/systemd/system/jarvis-update.timer >/dev/null <<UNIT
+[Unit]
+Description=Check for Jarvis updates every 10 minutes
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=10min
+[Install]
+WantedBy=timers.target
+UNIT
 sudo systemctl daemon-reload
 sudo systemctl enable --now jarvis >/dev/null 2>&1
+sudo systemctl enable --now jarvis-update.timer >/dev/null 2>&1
 sudo systemctl restart jarvis
 
 if [ ! -f ~/.jarvis_login_set ]; then

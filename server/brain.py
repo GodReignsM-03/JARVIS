@@ -59,10 +59,19 @@ def _split_ready(buf: str) -> tuple[list[str], str]:
 _CLAUSE = re.compile(r"^(.{25,}?[,;:—])\s+(.*)$", re.S)
 
 
+_TAIL_WORDS = re.compile(r"^(sir|ma'am|then|too|as well|though|of course|indeed)\b", re.I)
+
+
 def _first_clause(buf: str) -> tuple[str, str]:
-    """A first clause long enough to sound natural on its own (e.g. 'I'd suggest the salmon tonight,')."""
+    """A first clause long enough to sound natural on its own (e.g. 'I'd suggest the salmon tonight,').
+    Only split once we've seen what comes next, and never strand a short tail like ', sir.'"""
     m = _CLAUSE.match(buf)
-    return (m.group(1).strip(), m.group(2)) if m else ("", buf)
+    if not m:
+        return "", buf
+    rest = m.group(2)
+    if len(rest) < 20 or _TAIL_WORDS.match(rest.lstrip()):
+        return "", buf  # wait: the sentence is about to end, or the next words belong with this clause
+    return m.group(1).strip(), rest
 
 
 async def warm_up() -> None:
@@ -123,7 +132,9 @@ async def chat(session: str, text: str) -> AsyncIterator[dict]:
                         yield {"type": "sentence", "text": s}
                         continue
                     pending = f"{pending} {s}".strip()
-                    if len(pending) >= 150:
+                    # Send each finished sentence promptly (very short ones ride along with the next),
+                    # so the next piece of audio is ready before the current one finishes playing.
+                    if len(pending) >= 40:
                         spoken.append(pending)
                         yield {"type": "sentence", "text": pending}
                         pending = ""
