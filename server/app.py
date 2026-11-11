@@ -1,4 +1,4 @@
-"""Jarvis web server (phase 0). Serves ONLY the web/ folder plus the /api routes."""
+"""Jarvis web server. Serves ONLY the allowlisted web/ files plus the /api routes."""
 import asyncio
 import json
 import time
@@ -6,7 +6,9 @@ import time
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
 
-from . import brain, config, voice
+from zoneinfo import ZoneInfo
+
+from . import brain, config, db, push, scheduler, voice
 
 app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
 
@@ -15,6 +17,11 @@ STATIC = {  # explicit allowlist: nothing else is ever served
     "/app.js": ("app.js", "text/javascript"),
     "/orb.js": ("orb.js", "text/javascript"),
     "/style.css": ("style.css", "text/css"),
+    "/sw.js": ("sw.js", "text/javascript"),
+    "/manifest.json": ("manifest.json", "application/manifest+json"),
+    "/icon-192.png": ("icon-192.png", "image/png"),
+    "/icon-512.png": ("icon-512.png", "image/png"),
+    "/apple-touch-icon.png": ("icon-192.png", "image/png"),
 }
 
 
@@ -38,7 +45,48 @@ async def health():
         "brain_configured": config.brain_configured(),
         "voice_loaded": voice.loaded(),
         "fast": config.FAST,
+        "notification_devices": push.count(),
+        "safe_mode": brain._safe_mode,
+        "last_error": brain.last_error,
     }
+
+
+async def _small_json(request: Request) -> dict:
+    raw = await request.body()
+    if len(raw) > 8192:
+        raise HTTPException(413, "request too large")
+    try:
+        return json.loads(raw or b"{}")
+    except ValueError:
+        raise HTTPException(400, "invalid JSON")
+
+
+@app.get("/api/push/key")
+async def push_key():
+    return {"key": await asyncio.to_thread(push.public_key)}
+
+
+@app.post("/api/push/subscribe")
+async def push_subscribe(request: Request):
+    sub = await _small_json(request)
+    if not str(sub.get("endpoint", "")).startswith("https://") or "keys" not in sub:
+        raise HTTPException(400, "bad subscription")
+    push.subscribe(sub)
+    result = await asyncio.to_thread(push.send, "Jarvis", "Notifications are on, sir. Reminders will reach you here.")
+    return {"ok": result["sent"] > 0, **result}
+
+
+@app.post("/api/timezone")
+async def set_timezone(request: Request):
+    tz = str((await _small_json(request)).get("tz", ""))
+    try:
+        ZoneInfo(tz)
+    except Exception:
+        raise HTTPException(400, "unknown time zone")
+    if db.get_setting("timezone") != tz:
+        db.set_setting("timezone", tz)
+        db.log("time zone", tz)
+    return {"ok": True}
 
 
 async def _json_body(request: Request) -> dict:
@@ -100,6 +148,8 @@ async def static(path: str):
 
 @app.on_event("startup")
 async def warm_up():
+    db.init()
+    asyncio.create_task(scheduler.run_forever())  # fires reminders 24/7, app open or not
     await brain.warm_up()
     # Load the voice and pre-render the greeting so the first words are instant.
     if await asyncio.to_thread(voice.load):

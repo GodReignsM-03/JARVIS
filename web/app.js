@@ -92,6 +92,71 @@ function showTiming() {
   $("m-voice").textContent = t.brainAt ? f(t.voiceAt - t.brainAt) + (t.ttsMs != null ? " (" + f(t.ttsMs) + " making audio)" : "") : "—";
 }
 
+// Receipts: a small line for every action the database confirmed (or that failed).
+const RECEIPT = {
+  create_reminder: (r) => `Reminder saved: ${r.text}, ${r.due}`,
+  update_reminder: (r) => `Reminder changed: ${r.text}, ${r.due}`,
+  cancel_reminder: (r) => `Reminder #${r.id} cancelled`,
+  log_routine: (r) => `Logged: ${r.routine}`,
+  set_routine_interval: (r) => `${r.routine}: every ${r.every_days} days`,
+  log_water: (r) => `Water today: ${r.today_ml} / ${r.goal_ml} ml`,
+  set_water_goal: (r) => `Water goal: ${r.goal_ml} ml`,
+  remember: (r) => `Remembered: ${r.fact}`,
+  forget: (r) => `Forgotten #${r.id}`,
+  save_note: (r) => `Note saved (${r.tag})`,
+};
+function addReceipt(ev) {
+  const fmt = RECEIPT[ev.tool];
+  if (!fmt && ev.ok) return;  // look-ups (lists, status) don't need a receipt
+  const el = document.createElement("div");
+  el.className = "receipt" + (ev.ok ? "" : " fail");
+  el.textContent = ev.ok ? "✓ " + fmt(ev.result) : "✗ Didn't work: " + (ev.result.error || ev.tool);
+  $("receipts").appendChild(el);
+}
+
+// ---------- Notifications (reminders reach the phone when Jarvis is closed) ----------
+function b64ToBytes(b64) {
+  const pad = "=".repeat((4 - (b64.length % 4)) % 4);
+  const raw = atob((b64 + pad).replace(/-/g, "+").replace(/_/g, "/"));
+  return Uint8Array.from(raw, (c) => c.charCodeAt(0));
+}
+const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent);
+const isStandalone = matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+
+async function setupNotifications() {
+  if (!("serviceWorker" in navigator)) return;
+  const reg = await navigator.serviceWorker.register("/sw.js");
+  const btn = $("notify-btn");
+  if (!("PushManager" in window)) {
+    if (isIOS && !isStandalone) { btn.textContent = "Reminders: add to Home Screen"; btn.hidden = false; }
+    return;
+  }
+  const existing = await reg.pushManager.getSubscription();
+  if (existing && Notification.permission === "granted") return;  // already on
+  btn.hidden = false;
+}
+
+$("notify-btn").addEventListener("click", async () => {
+  const btn = $("notify-btn");
+  if (!("PushManager" in window)) {
+    captionJarvis("On iPhone, tap Share, then Add to Home Screen, and open me from there. Then this button turns reminders on.");
+    return;
+  }
+  try {
+    const perm = await Notification.requestPermission();
+    if (perm !== "granted") { captionJarvis("Notifications weren't allowed, sir. You can change that in Settings."); return; }
+    const reg = await navigator.serviceWorker.ready;
+    const { key } = await (await fetch("/api/push/key")).json();
+    const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ToBytes(key) });
+    const r = await (await fetch("/api/push/subscribe", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(sub) })).json();
+    if (r.ok) { btn.hidden = true; captionJarvis("Reminders are on, sir. You should see a test notification now."); }
+    else captionJarvis("I saved the setting, but the test notification didn't go through, sir.");
+  } catch (e) {
+    captionJarvis("I couldn't turn notifications on, sir: " + e.message);
+  }
+});
+
 // A soft two-note chime the instant he hears you, so there's never dead air.
 function chime() {
   if (MUTE || !audioCtx) return;
@@ -126,6 +191,7 @@ async function ask(text, heardAt) {
   timing = { gen: myGen, heardAt: heardAt || performance.now(), sentAt: performance.now() };
   captionYou(text);
   captionJarvis("");
+  $("receipts").textContent = "";
   setPhase("thinking");
   chime();
   chatAbort = new AbortController();
@@ -156,6 +222,8 @@ async function ask(text, heardAt) {
           clearTimeout(filler);
           captionJarvis(ev.text, true);
           say(ev.text, myGen);
+        } else if (ev.type === "action") {
+          addReceipt(ev);
         } else if (ev.type === "error") {
           captionJarvis(ev.message);
           setPhase("error", "error");
@@ -277,6 +345,9 @@ async function boot() {
   analyser.connect(audioCtx.destination);
   meter();
   setupRecognition();
+  fetch("/api/timezone", { method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ tz: Intl.DateTimeFormat().resolvedOptions().timeZone }) }).catch(() => {});
+  setupNotifications().catch(() => {});
   try {
     const h = await (await fetch("/api/health")).json();
     $("d-model").textContent = (h.brain_configured ? h.model : h.model + " (no key)") + (h.fast ? " · fast" : "");

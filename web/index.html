@@ -8,6 +8,8 @@
   <meta name="theme-color" content="#03070d">
   <title>JARVIS</title>
   <link rel="stylesheet" href="/style.css">
+  <link rel="manifest" href="/manifest.json">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 </head>
 <body>
   <div id="hud">
@@ -29,6 +31,7 @@
       <canvas id="orb" aria-label="Jarvis"></canvas>
       <div id="caption-you" class="caption you"></div>
       <div id="caption-jarvis" class="caption jarvis"></div>
+      <div id="receipts" aria-live="polite"></div>
     </main>
 
     <aside id="right" class="panel">
@@ -47,6 +50,7 @@
 
     <footer>
       <button id="wake-toggle" class="chip" aria-pressed="false">“Hey Jarvis” off</button>
+      <button id="notify-btn" class="chip" hidden>Turn on reminders</button>
       <form id="type-form" autocomplete="off">
         <input id="type-input" placeholder="Type instead…" maxlength="500">
       </form>

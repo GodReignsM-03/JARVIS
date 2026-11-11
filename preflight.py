@@ -50,7 +50,8 @@ def model_known():
 
 def served_match_disk():
     stale = []
-    for path, name in [("/", "index.html"), ("/app.js", "app.js"), ("/orb.js", "orb.js"), ("/style.css", "style.css")]:
+    for path, name in [("/", "index.html"), ("/app.js", "app.js"), ("/orb.js", "orb.js"), ("/style.css", "style.css"),
+                       ("/sw.js", "sw.js"), ("/manifest.json", "manifest.json"), ("/icon-192.png", "icon-192.png")]:
         code, _, body = req(path)
         disk = (ROOT / "web" / name).read_bytes()
         if code != 200 or hashlib.sha256(body).digest() != hashlib.sha256(disk).digest():
@@ -59,7 +60,7 @@ def served_match_disk():
 
 
 def secrets_not_served():
-    leaks = [p for p in ["/.env", "/server/config.py", "/../.env", "/%2e%2e/.env", "/preflight.py", "/models/kokoro/model.onnx"]
+    leaks = [p for p in ["/.env", "/server/config.py", "/../.env", "/%2e%2e/.env", "/preflight.py", "/models/kokoro/model.onnx", "/data/jarvis.db", "/data/vapid_private.pem"]
              if req(p)[0] == 200]
     return ("pass", None) if not leaks else ("fail", "served: " + ", ".join(leaks))
 
@@ -84,6 +85,16 @@ def voice_works():
     return ("pass", f"{len(body)//1024} KB mp3") if ok else ("fail", f"HTTP {code}, {len(body)} bytes")
 
 
+def push_ready():
+    code, _, body = req("/api/push/key")
+    key = json.loads(body).get("key", "") if code == 200 else ""
+    h = json.loads(req("/api/health")[2])
+    if len(key) < 80:
+        return "fail", f"HTTP {code}"
+    n = h.get("notification_devices", 0)
+    return ("pass", f"{n} phone(s) signed up") if n else ("warn", "server ready; no phone has turned on reminders yet")
+
+
 def brain_answers():
     h = json.loads(req("/api/health")[2])
     code, _, body = req("/api/chat", {"text": "Preflight: reply with one short sentence.", "session": "preflight"}, timeout=120)
@@ -106,6 +117,7 @@ check("Secrets and source are never served", secrets_not_served)
 check("Security headers present", security_headers)
 check("Oversized requests refused", oversized_refused)
 check("Voice: text becomes processed audio", voice_works)
+check("Notifications: server keys ready, phones signed up", push_ready)
 check("Brain: real question gets a real streamed answer", brain_answers)
 
 p, f, w = results.count("pass"), results.count("fail"), results.count("warn")

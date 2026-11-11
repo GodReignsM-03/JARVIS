@@ -65,3 +65,10 @@ footer { grid-area: foot; display: flex; gap: 10px; align-items: center; }
   .panel { display: none; }
   #orb { width: min(86vw, 420px); height: min(86vw, 420px); }
 }
+
+/* Receipts: what Jarvis actually saved, confirmed by the database */
+#receipts { display: flex; flex-direction: column; align-items: center; gap: 6px; margin-top: 10px; min-height: 1em; }
+.receipt { font-size: 13px; color: var(--cyan); border: 1px solid var(--line); border-radius: 999px; padding: 4px 12px;
+  background: rgba(8, 24, 36, 0.6); }
+.receipt.fail { color: var(--amber); }
+#notify-btn { color: var(--amber); border-color: var(--amber); }
