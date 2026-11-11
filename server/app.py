@@ -103,5 +103,5 @@ async def warm_up():
     await brain.warm_up()
     # Load the voice and pre-render the greeting so the first words are instant.
     if await asyncio.to_thread(voice.load):
-        for line in ["Hello, sir.", "One moment, sir.", "Right away, sir.", "Just a moment."]:
+        for line in ["Hello, sir."]:
             await asyncio.to_thread(voice.speak, line)

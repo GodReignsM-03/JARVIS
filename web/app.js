@@ -7,7 +7,7 @@ const FINAL_MS = 350;    // shorter pause once the browser has confirmed the phr
 const FOLLOW_UP_MS = 8000;   // after Jarvis answers, you can reply without saying "Jarvis" again
 const WAKE = /\b(?:hey|hi|ok|okay)?\s*,?\s*jarvis\b[\s,.!?]*/i;
 const INTERRUPT = /\b(stop|wait|hold on|jarvis|enough|quiet)\b/i;
-const FILLER_MS = 1500;      // if he hasn't started answering by now, he acknowledges you
+const FILLER_MS = 0;         // spoken "One moment, sir." while thinking: OFF (owner's preference). Set e.g. 1500 to turn on.
 const FILLERS = ["One moment, sir.", "Right away, sir.", "Just a moment."];
 // ---------------------------------------------------------------------------
 
@@ -130,9 +130,9 @@ async function ask(text, heardAt) {
   chime();
   chatAbort = new AbortController();
   let gotAny = false;
-  const filler = setTimeout(() => {
+  const filler = FILLER_MS > 0 ? setTimeout(() => {
     if (!gotAny && myGen === gen) say(FILLERS[Math.floor(Math.random() * FILLERS.length)], myGen);
-  }, FILLER_MS);
+  }, FILLER_MS) : null;
   try {
     const r = await fetch("/api/chat", { method: "POST", signal: chatAbort.signal,
       headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text, session: SESSION }) });
