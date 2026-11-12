@@ -8,7 +8,7 @@ from fastapi.responses import FileResponse, JSONResponse, Response, StreamingRes
 
 from zoneinfo import ZoneInfo
 
-from . import backup, brain, config, db, push, scheduler, voice
+from . import backup, brain, config, db, proactive, push, scheduler, voice
 
 app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
 
@@ -122,6 +122,7 @@ async def tts(request: Request):
 async def chat(request: Request):
     body = await _json_body(request)
     session = str(body.get("session", "default"))[:64]
+    proactive.note_chat()
 
     async def events():
         async for ev in brain.chat(session, body["text"]):

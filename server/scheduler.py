@@ -4,7 +4,7 @@ fires once as soon as it's back, never twice."""
 import asyncio
 from datetime import datetime, timezone
 
-from . import backup, db, push
+from . import backup, db, proactive, push
 
 INTERVAL_S = 20
 
@@ -29,6 +29,10 @@ async def run_forever() -> None:
             await asyncio.to_thread(fire_due)
         except Exception as e:
             print(f"[scheduler] {type(e).__name__}: {e}", flush=True)
+        try:
+            await asyncio.to_thread(proactive.run_due)
+        except Exception as e:
+            print(f"[proactive] {type(e).__name__}: {e}", flush=True)
         try:
             if backup.due():
                 await asyncio.to_thread(backup.run_backup)

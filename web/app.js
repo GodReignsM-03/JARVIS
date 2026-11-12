@@ -104,6 +104,7 @@ const RECEIPT = {
   remember: (r) => `Remembered: ${r.fact}`,
   forget: (r) => `Forgotten #${r.id}`,
   save_note: (r) => `Note saved (${r.tag})`,
+  set_nudges: (r) => `${r.kind} nudges ${r.on ? "on" : "off"}`,
 };
 function addReceipt(ev) {
   const fmt = RECEIPT[ev.tool];

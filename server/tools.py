@@ -85,6 +85,15 @@ TOOLS = [
     {"name": "search_notes", "strict": True,
      "description": "Find saved notes/ideas by words or tag. Empty query lists the most recent.",
      "input_schema": _obj({"query": {"type": "string"}}, ["query"])},
+    {"name": "set_nudges", "strict": True,
+     "description": "Turn Jarvis's own nudges on or off: morning summary (6:30 AM if not opened yet), water checks, "
+                    "overdue-routine reminder (6 PM). Use when the owner says e.g. 'stop the water reminders'.",
+     "input_schema": _obj({"kind": {"type": "string", "enum": ["morning", "water", "routines"]},
+                           "on": {"type": "boolean"}}, ["kind", "on"])},
+    {"name": "briefing", "strict": True,
+     "description": "Everything for 'what does my day look like' / 'morning, Jarvis': today's and upcoming reminders, "
+                    "overdue routines, water so far. Calendar is not connected yet.",
+     "input_schema": _obj({}, [])},
     {"name": "recent_activity", "strict": True,
      "description": "What Jarvis has done recently (the activity log), for 'what did you do today?'.",
      "input_schema": _obj({"hours": {"type": "integer"}}, ["hours"])},
@@ -242,6 +251,19 @@ def recent_activity(hours: int) -> dict:
     with db.conn() as c:
         rows = c.execute("SELECT * FROM activity WHERE ts_utc>? ORDER BY id DESC LIMIT 40", (since,)).fetchall()
     return {"ok": True, "activity": [{"when": _local(r["ts_utc"]), "action": r["action"], "detail": r["detail"]} for r in rows]}
+
+
+def set_nudges(kind: str, on: bool) -> dict:
+    db.set_setting(f"nudge_{kind}", "on" if on else "off")
+    db.log("nudges", f"{kind} {'on' if on else 'off'}")
+    return {"ok": True, "kind": kind, "on": on}
+
+
+def briefing() -> dict:
+    return {"ok": True, "now": datetime.now(tz()).strftime("%A %d %B, %I:%M %p"),
+            "reminders": list_reminders()["reminders"][:8],
+            "overdue_routines": [r for r in routines_status()["routines"] if r["overdue"]],
+            "water": water_status(), "calendar": "not connected yet"}
 
 
 HANDLERS = {t["name"]: globals()[t["name"]] for t in TOOLS}
