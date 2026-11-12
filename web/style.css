@@ -110,3 +110,13 @@ footer { grid-area: foot; display: flex; gap: 10px; align-items: center; border-
   .status { min-width: 0; }
   #orb { width: min(92vw, 440px); height: min(92vw, 440px); }
 }
+
+/* Calendar setup */
+.modal { position: fixed; inset: 0; background: rgba(2,8,16,0.82); display: grid; place-items: center; z-index: 20; padding: 16px; }
+.modal[hidden] { display: none; }
+.modal-box { width: min(560px, 100%); background: #061626; border: 1px solid var(--line-strong); padding: 20px; }
+.modal-box h2 { margin: 0 0 12px; font: 600 12px var(--mono); letter-spacing: 0.3em; text-transform: uppercase; color: var(--cyan); }
+.steps { padding-left: 0; list-style: none; display: grid; gap: 12px; font-size: 14px; }
+.steps a.chip { text-decoration: none; display: inline-block; color: var(--cyan); }
+#cal-url { width: 100%; margin: 8px 0; background: #030a14; border: 1px solid var(--line); color: var(--text); padding: 10px; font-size: 14px; }
+#cal-msg { min-height: 1.2em; margin: 8px 0; }

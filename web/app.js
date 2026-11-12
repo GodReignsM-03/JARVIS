@@ -111,6 +111,9 @@ const RECEIPT = {
   forget: (r) => `Forgotten #${r.id}`,
   save_note: (r) => `Note saved (${r.tag})`,
   set_nudges: (r) => `${r.kind} nudges ${r.on ? "on" : "off"}`,
+  calendar_add: (r) => `Added to calendar: ${r.title}, ${r.when}`,
+  calendar_move: (r) => `Moved: ${r.title}, ${r.when}`,
+  calendar_delete: (r) => `Deleted from calendar: ${r.title}`,
 };
 function addReceipt(ev) {
   const fmt = RECEIPT[ev.tool];
@@ -136,6 +139,10 @@ async function refreshPanels() {
     fill("p-overdue", d.overdue, (r) => `<b>${Math.round(r.days_since)} days</b><span>${esc(r.routine)}</span>`, "All caught up.");
     const logText = (a) => (a.detail ? `${a.action}: ${a.detail}` : a.action).replace(/ -> .*$/, "").slice(0, 60);
     fill("p-log", d.activity, (a) => `<b>${esc(a.when.split(", ").pop())}</b><span>${esc(logText(a))}</span>`, "Nothing yet.");
+    if (d.calendar_connected) {
+      fill("p-calendar", d.calendar_today, (e) => `<b>${esc(e.when.includes("all day") ? "All day" : e.when.split(", ").pop().split(" to ")[0])}</b><span>${esc(e.title)}</span>`, "Nothing today.");
+    }
+    $("cal-btn").hidden = !!d.calendar_connected;
     const w = d.water;
     $("p-water").textContent = `${w.today_ml} / ${w.goal_ml} ml`;
     $("p-water-bar").style.width = Math.min(100, (100 * w.today_ml) / w.goal_ml) + "%";
@@ -147,6 +154,30 @@ async function refreshPanels() {
 setInterval(() => {
   $("s-time").textContent = new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 }, 1000);
+
+// ---------- Google Calendar setup ----------
+$("cal-btn").addEventListener("click", () => { $("cal-setup").hidden = false; });
+$("cal-close").addEventListener("click", () => { $("cal-setup").hidden = true; });
+$("cal-copy").addEventListener("click", async () => {
+  try {
+    const text = await (await fetch("/api/calendar/script")).text();
+    await navigator.clipboard.writeText(text);
+    $("cal-copied").textContent = "Copied.";
+  } catch (e) { $("cal-copied").textContent = "Couldn't copy: " + e.message; }
+});
+$("cal-connect").addEventListener("click", async () => {
+  $("cal-msg").textContent = "Testing the connection…";
+  try {
+    const r = await (await fetch("/api/calendar/connect", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url: $("cal-url").value }) })).json();
+    if (r.ok) {
+      $("cal-msg").textContent = "Connected: " + (r.calendars || []).join(", ");
+      captionJarvis("Your calendar is connected, sir.");
+      say("Your calendar is connected, sir.");
+      setTimeout(() => { $("cal-setup").hidden = true; refreshPanels(); }, 1500);
+    } else $("cal-msg").textContent = "Not connected: " + (r.error || "unknown problem");
+  } catch (e) { $("cal-msg").textContent = "Not connected: " + e.message; }
+});
 
 // ---------- Notifications (reminders reach the phone when Jarvis is closed) ----------
 function b64ToBytes(b64) {

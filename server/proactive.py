@@ -34,7 +34,12 @@ def morning_text(now: datetime) -> str | None:
     todays = [r["text"] for r in rows
               if datetime.fromisoformat(r["due_utc"]).astimezone(now.tzinfo).strftime("%Y-%m-%d") == today]
     overdue = [r["routine"] for r in tools.routines_status()["routines"] if r["overdue"]]
+    from . import gcal
+    events = gcal.today_events()
     parts = ["Good morning, sir."]
+    if events:
+        first = events[0]
+        parts.append(f"{len(events)} on the calendar, starting with {first['title']} ({first['when'].split(', ')[-1]}).")
     if todays:
         parts.append(f"Today: {', '.join(todays[:4])}.")
     if overdue:

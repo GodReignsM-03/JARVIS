@@ -71,9 +71,24 @@ async def dashboard():
         overdue = [r for r in tools.routines_status()["routines"] if r["overdue"]]
         hidden = {"backup", "time zone", "nudges"}
         act = [a for a in tools.recent_activity(72)["activity"] if a["action"] not in hidden][:8]
+        from . import gcal
         return {"reminders": rem, "overdue": overdue, "water": tools.water_status(), "activity": act,
-                "month_usd": round(spend.month_to_date(), 2)}
+                "month_usd": round(spend.month_to_date(), 2), "calendar_connected": gcal.connected(),
+                "calendar_today": gcal.today_events()}
     return await asyncio.to_thread(build)
+
+
+@app.get("/api/calendar/script")
+async def calendar_script():
+    from . import gcal
+    return Response(gcal.script_text(), media_type="text/plain")
+
+
+@app.post("/api/calendar/connect")
+async def calendar_connect(request: Request):
+    from . import gcal
+    url = str((await _small_json(request)).get("url", ""))
+    return await asyncio.to_thread(gcal.connect, url)
 
 
 @app.get("/api/push/key")

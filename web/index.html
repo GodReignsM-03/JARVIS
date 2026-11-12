@@ -26,6 +26,8 @@
 
     <aside id="left" class="panel">
       <h2>Today</h2>
+      <h3>Calendar</h3>
+      <ol id="p-calendar" class="list"><li class="empty">Not connected.</li></ol>
       <h3>Reminders</h3>
       <ol id="p-reminders" class="list"><li class="empty">Nothing scheduled.</li></ol>
       <h3>Overdue</h3>
@@ -66,10 +68,27 @@
     <footer>
       <button id="wake-toggle" class="chip" aria-pressed="false">Mic off</button>
       <button id="notify-btn" class="chip warn" hidden>Turn on reminders</button>
+      <button id="cal-btn" class="chip warn" hidden>Connect calendar</button>
       <form id="type-form" autocomplete="off">
         <input id="type-input" placeholder="Speak, or type here…" maxlength="500">
       </form>
     </footer>
+  </div>
+
+  <div id="cal-setup" class="modal" hidden>
+    <div class="modal-box">
+      <h2>Connect Google Calendar</h2>
+      <ol class="steps">
+        <li><button id="cal-copy" class="chip">1 · Copy script</button> <span id="cal-copied" class="sub"></span></li>
+        <li><a class="chip" href="https://script.new" target="_blank" rel="noopener">2 · Open Google Apps Script</a></li>
+        <li>3 · Paste the script, then Deploy → New deployment → Web app (Execute as: Me · Who has access: Anyone) → Deploy → Authorize.</li>
+        <li>4 · Copy the <b>Web app URL</b> Google shows you and paste it here:
+          <input id="cal-url" placeholder="https://script.google.com/macros/s/…/exec">
+          <button id="cal-connect" class="chip">Connect</button></li>
+      </ol>
+      <div id="cal-msg" class="sub"></div>
+      <button id="cal-close" class="chip">Close</button>
+    </div>
   </div>
 
   <div id="boot" role="button" tabindex="0">
