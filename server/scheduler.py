@@ -4,7 +4,9 @@ fires once as soon as it's back, never twice."""
 import asyncio
 from datetime import datetime, timezone
 
-from . import backup, db, proactive, push
+import time
+
+from . import backup, db, gcal, proactive, push
 
 INTERVAL_S = 20
 
@@ -29,6 +31,11 @@ async def run_forever() -> None:
             await asyncio.to_thread(fire_due)
         except Exception as e:
             print(f"[scheduler] {type(e).__name__}: {e}", flush=True)
+        try:
+            if gcal.connected() and time.time() - gcal._week["at"] > 120:
+                await asyncio.to_thread(gcal.week_events, True)  # keep the calendar copy fresh in the background
+        except Exception as e:
+            print(f"[calendar] {type(e).__name__}: {e}", flush=True)
         try:
             await asyncio.to_thread(proactive.run_due)
         except Exception as e:

@@ -80,7 +80,7 @@ def calendar_events(start_local: str, end_local: str) -> dict:
 
 
 def calendar_add(title: str, start_local: str, end_local: str, location: str) -> dict:
-    _cache["at"] = 0
+    _cache["at"] = _week["at"] = 0
     r = _call("create", title=title, start=_iso_utc(start_local), end=_iso_utc(end_local), location=location)
     if r.get("ok"):
         db.log("calendar event added", f"{title} @ {start_local}")
@@ -89,7 +89,7 @@ def calendar_add(title: str, start_local: str, end_local: str, location: str) ->
 
 
 def calendar_move(id: str, start_local: str, end_local: str) -> dict:
-    _cache["at"] = 0
+    _cache["at"] = _week["at"] = 0
     r = _call("move", id=id, start=_iso_utc(start_local), end=_iso_utc(end_local))
     if r.get("ok"):
         db.log("calendar event moved", f"{r.get('title')} -> {start_local}")
@@ -98,7 +98,7 @@ def calendar_move(id: str, start_local: str, end_local: str) -> dict:
 
 
 def calendar_delete(id: str) -> dict:
-    _cache["at"] = 0
+    _cache["at"] = _week["at"] = 0
     r = _call("delete", id=id)
     if r.get("ok"):
         db.log("calendar event deleted", r.get("title", id))
@@ -106,6 +106,23 @@ def calendar_delete(id: str) -> dict:
 
 
 _cache: dict = {"at": 0.0, "events": []}
+_week: dict = {"at": 0.0, "events": []}
+
+
+def week_events(refresh: bool = False) -> list[dict]:
+    """Next 7 days of events. Normally returns the copy the background refresh keeps (instant);
+    only fetches from Google when asked to refresh, or when there's no copy yet / it was just changed."""
+    import time
+    if not connected():
+        return []
+    if not refresh and _week["at"] > 0:
+        return _week["events"]
+    now = datetime.now(tools.tz())
+    start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    r = calendar_events(start.strftime("%Y-%m-%dT%H:%M"), (start + timedelta(days=7)).strftime("%Y-%m-%dT%H:%M"))
+    events = r.get("events", []) if r.get("ok") else []
+    _week.update(at=time.time(), events=events)
+    return events
 
 
 def today_events() -> list[dict]:

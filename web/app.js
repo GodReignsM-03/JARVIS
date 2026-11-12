@@ -57,9 +57,25 @@ async function fetchSpeech(text, myGen) {
   return audioCtx.decodeAudioData(buf);
 }
 
-function playBuffer(buffer, myGen) {
+// Live subtitles: reveal a phrase word by word over the time its audio plays (longer words take longer).
+function revealWords(text, seconds, myGen) {
+  const words = text.split(/\s+/).filter(Boolean);
+  const total = words.reduce((n, w) => n + w.length + 2, 0);
+  let i = 0;
+  const next = () => {
+    if (myGen !== gen || i >= words.length) return;
+    captionJarvis(words[i], true);
+    const ms = (seconds * 1000 * (words[i].length + 2)) / total;
+    i++;
+    setTimeout(next, ms);
+  };
+  next();
+}
+
+function playBuffer(buffer, myGen, caption) {
   return new Promise((resolve) => {
-    if (!buffer || myGen !== gen) return resolve();
+    if (myGen !== gen) return resolve();
+    if (!buffer) { if (caption) captionJarvis(caption, true); return resolve(); }  // no voice: show the words at once
     const src = audioCtx.createBufferSource();
     src.buffer = buffer;
     src.connect(analyser);
@@ -67,15 +83,17 @@ function playBuffer(buffer, myGen) {
     src.onended = () => { if (currentSource === src) currentSource = null; resolve(); };
     setPhase("speaking");
     src.start();
+    if (caption) revealWords(caption, buffer.duration, myGen);
     if (timing && timing.gen === myGen && timing.brainAt && !timing.voiceAt) { timing.voiceAt = performance.now(); showTiming(); }
   });
 }
 
 // Queue a sentence: fetch its audio right away (in parallel), play in order.
-function say(text, myGen = gen) {
-  if (MUTE) return playQueue;
+// caption=true: the words appear on screen in time with the voice.
+function say(text, myGen = gen, caption = false) {
+  if (MUTE) { if (caption) captionJarvis(text, true); return playQueue; }
   const audio = fetchSpeech(text, myGen).catch(() => { $("d-voice").textContent = "offline"; return null; });
-  playQueue = playQueue.then(() => audio).then((b) => playBuffer(b, myGen));
+  playQueue = playQueue.then(() => audio).then((b) => playBuffer(b, myGen, caption ? text : null));
   return playQueue;
 }
 
@@ -295,8 +313,7 @@ async function ask(text, heardAt) {
           if (!gotAny && timing && timing.gen === myGen) timing.brainAt = performance.now();
           gotAny = true;
           clearTimeout(filler);
-          captionJarvis(ev.text, true);
-          say(ev.text, myGen);
+          say(ev.text, myGen, true);
         } else if (ev.type === "action") {
           addReceipt(ev);
         } else if (ev.type === "error") {
