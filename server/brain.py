@@ -16,7 +16,10 @@ from . import config, spend, tools
 VOICE_RULES = """
 ## Speaking rules (you are heard, not read)
 - Your words are converted to speech. Never use markdown, bullet points, emoji, or symbols.
-- Write numbers and times the way a person says them ("half seven", "nine fifteen", "twenty dollars").
+- Times: say them the plain American way, written as words so they're spoken clearly: "nine a.m.", "seven thirty p.m.",
+  "noon", "midnight", "a quarter to five". Never British forms like "half seven", never 24-hour time, never "19:30".
+  Dates the same way: "Friday the fourteenth", "tomorrow at noon".
+- Other numbers as a person says them: "twenty dollars", "three liters".
 - Lead with the answer. One or two short sentences unless asked for more.
 - Use punctuation for natural pauses: commas, full stops, the occasional ellipsis before something important.
 
