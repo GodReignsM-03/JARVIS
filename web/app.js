@@ -450,6 +450,7 @@ async function boot() {
     const h = await (await fetch("/api/health")).json();
     $("d-model").textContent = (h.brain_configured ? h.model : h.model + " (no key)") + (h.fast ? " · fast" : "");
     $("d-voice").textContent = h.voice_loaded ? "Jarvis H · AI 2.5" : "not installed";
+    $("d-version").textContent = h.version || "—";
   } catch (_) { $("d-model").textContent = "server offline"; }
   captionJarvis("Hello, sir.");
   await say("Hello, sir.");

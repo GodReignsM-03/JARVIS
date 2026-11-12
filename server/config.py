@@ -39,3 +39,16 @@ MAX_TEXT = 2000
 
 def brain_configured() -> bool:
     return bool(os.environ.get("ANTHROPIC_API_KEY"))
+
+
+def version() -> str:
+    """Short id of the code version running (shown in Diagnostics)."""
+    import subprocess
+    try:
+        return subprocess.run(["git", "log", "-1", "--format=%h %cd", "--date=format:%b %d %H:%M"], cwd=ROOT,
+                              capture_output=True, text=True, timeout=5).stdout.strip() or "unknown"
+    except Exception:
+        return "unknown"
+
+
+VERSION = version()

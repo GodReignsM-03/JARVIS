@@ -40,6 +40,7 @@ async def security_headers(request: Request, call_next):
 async def health():
     return {
         "ok": True,
+        "version": config.VERSION,
         "model": config.MODEL,
         "model_known": config.MODEL in config.KNOWN_MODELS,
         "brain_configured": config.brain_configured(),
