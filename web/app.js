@@ -33,6 +33,12 @@ function setPhase(p, label) {
   const s = $("status");
   s.className = "status " + p;
   s.textContent = label || p;
+  const r = document.querySelector(".reactor");
+  if (r) {
+    r.classList.toggle("active", p === "speaking" || p === "thinking" || p === "listening");
+    $("reactor-label").textContent = { idle: "Standing by", listening: "Listening · just talk", thinking: "Thinking",
+      speaking: "Speaking", error: "Attention" }[p] || p;
+  }
 }
 function captionYou(t) { $("caption-you").textContent = t ? "“" + t + "”" : ""; }
 function captionJarvis(t, append) {
@@ -115,6 +121,33 @@ function addReceipt(ev) {
   $("receipts").appendChild(el);
 }
 
+// ---------- HUD panels (real data from the server) ----------
+function esc(t) { const d = document.createElement("div"); d.textContent = t; return d.innerHTML; }
+function fill(id, items, render, empty) {
+  const el = $(id);
+  el.innerHTML = items.length ? items.map((x) => "<li>" + render(x) + "</li>").join("") : `<li class="empty">${empty}</li>`;
+}
+async function refreshPanels() {
+  try {
+    const d = await (await fetch("/api/dashboard")).json();
+    // "Thu 12 Nov 2026, 6:21 PM" -> "Thu 6:21 PM"
+    const shortWhen = (s) => { const [day, time] = s.split(", "); return day.split(" ")[0] + " " + (time || ""); };
+    fill("p-reminders", d.reminders, (r) => `<b>${esc(shortWhen(r.due))}</b><span>${esc(r.text)}</span>`, "Nothing scheduled.");
+    fill("p-overdue", d.overdue, (r) => `<b>${Math.round(r.days_since)} days</b><span>${esc(r.routine)}</span>`, "All caught up.");
+    const logText = (a) => (a.detail ? `${a.action}: ${a.detail}` : a.action).replace(/ -> .*$/, "").slice(0, 60);
+    fill("p-log", d.activity, (a) => `<b>${esc(a.when.split(", ").pop())}</b><span>${esc(logText(a))}</span>`, "Nothing yet.");
+    const w = d.water;
+    $("p-water").textContent = `${w.today_ml} / ${w.goal_ml} ml`;
+    $("p-water-bar").style.width = Math.min(100, (100 * w.today_ml) / w.goal_ml) + "%";
+    $("s-water").textContent = `${(w.today_ml / 1000).toFixed(1)} / ${(w.goal_ml / 1000).toFixed(1)} L`;
+    $("s-next").textContent = d.reminders.length ? d.reminders[0].text.slice(0, 22) : "—";
+    $("m-spend").textContent = "$" + d.month_usd.toFixed(2);
+  } catch (_) {}
+}
+setInterval(() => {
+  $("s-time").textContent = new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+}, 1000);
+
 // ---------- Notifications (reminders reach the phone when Jarvis is closed) ----------
 function b64ToBytes(b64) {
   const pad = "=".repeat((4 - (b64.length % 4)) % 4);
@@ -132,9 +165,19 @@ async function setupNotifications() {
     if (isIOS && !isStandalone) { btn.textContent = "Reminders: add to Home Screen"; btn.hidden = false; }
     return;
   }
-  const existing = await reg.pushManager.getSubscription();
-  if (existing && Notification.permission === "granted") return;  // already on
-  btn.hidden = false;
+  if (Notification.permission === "granted") { await subscribePush(reg); return; }
+  if (Notification.permission === "denied") { btn.textContent = "Reminders blocked in settings"; btn.hidden = false; }
+}
+
+// Subscribes this device for reminders (silently, once permission exists). Safe to call repeatedly.
+async function subscribePush(reg) {
+  reg = reg || await navigator.serviceWorker.ready;
+  if (await reg.pushManager.getSubscription()) return true;
+  const { key } = await (await fetch("/api/push/key")).json();
+  const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ToBytes(key) });
+  const r = await (await fetch("/api/push/subscribe", { method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(sub) })).json();
+  return r.ok;
 }
 
 $("notify-btn").addEventListener("click", async () => {
@@ -233,6 +276,7 @@ async function ask(text, heardAt) {
           $("m-tokens").textContent = ev.usage.input + " / " + ev.usage.output;
           $("m-cache").textContent = ev.usage.cache_read + " read";
           $("m-spend").textContent = "$" + ev.month_usd.toFixed(2) + (ev.fast ? " · fast" : "");
+          refreshPanels();
         }
       }
     }
@@ -322,7 +366,7 @@ function setMode(m) {
   try { localStorage.setItem("jarvis.mode", m); } catch (_) {}
   const b = $("wake-toggle");
   b.setAttribute("aria-pressed", m === "wake");
-  b.textContent = m === "wake" ? "“Hey Jarvis” on" : "“Hey Jarvis” off";
+  b.textContent = m === "wake" ? "Mic on · say “Jarvis”" : "Mic off · tap the orb";
   $("d-mode").textContent = m === "wake" ? "Hey Jarvis (while open)" : "Tap to talk";
   if (m === "wake") { recogWanted = true; startRecog(); setPhase("idle", "say “Jarvis”"); }
   else { recogWanted = false; if (recog) recog.stop(); setPhase("idle", "tap the orb"); }
@@ -339,6 +383,9 @@ $("type-form").addEventListener("submit", (e) => {
 // ---------- Boot ----------
 // Browsers block audio until you interact, so the greeting fires on the first tap.
 async function boot() {
+  // Browsers only allow the notification question during a tap, so it rides along with "Tap to wake".
+  const permAsk = ("Notification" in window && "PushManager" in window && Notification.permission === "default")
+    ? Notification.requestPermission() : null;
   $("boot").classList.add("hidden");
   audioCtx = new (window.AudioContext || window.webkitAudioContext)();
   analyser = audioCtx.createAnalyser();
@@ -348,7 +395,9 @@ async function boot() {
   setupRecognition();
   fetch("/api/timezone", { method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ tz: Intl.DateTimeFormat().resolvedOptions().timeZone }) }).catch(() => {});
-  setupNotifications().catch(() => {});
+  if (permAsk) permAsk.then(() => setupNotifications()).catch(() => {}); else setupNotifications().catch(() => {});
+  refreshPanels();
+  setInterval(refreshPanels, 30000);
   try {
     const h = await (await fetch("/api/health")).json();
     $("d-model").textContent = (h.brain_configured ? h.model : h.model + " (no key)") + (h.fast ? " · fast" : "");

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="theme-color" content="#03070d">
+  <meta name="theme-color" content="#030a14">
   <title>JARVIS</title>
   <link rel="stylesheet" href="/style.css">
   <link rel="manifest" href="/manifest.json">
@@ -14,17 +14,25 @@
 <body>
   <div id="hud">
     <header>
-      <span class="brand">J.A.R.V.I.S.</span>
-      <span id="status" class="status">offline</span>
+      <div class="brand">J.A.R.V.I.S.<small>just a rather very intelligent system</small></div>
+      <div class="stats">
+        <div><span>Local time</span><b id="s-time">—</b></div>
+        <div><span>Next</span><b id="s-next">—</b></div>
+        <div><span>Water</span><b id="s-water">—</b></div>
+        <div><span>Brain · month</span><b id="m-spend">—</b></div>
+      </div>
+      <div id="status" class="status">offline</div>
     </header>
 
     <aside id="left" class="panel">
-      <h2>System</h2>
-      <dl>
-        <dt>Brain</dt><dd id="d-model">—</dd>
-        <dt>Voice</dt><dd id="d-voice">—</dd>
-        <dt>Mode</dt><dd id="d-mode">Tap to talk</dd>
-      </dl>
+      <h2>Today</h2>
+      <h3>Reminders</h3>
+      <ol id="p-reminders" class="list"><li class="empty">Nothing scheduled.</li></ol>
+      <h3>Overdue</h3>
+      <ol id="p-overdue" class="list"><li class="empty">All caught up.</li></ol>
+      <h3>Water</h3>
+      <div class="bar"><i id="p-water-bar"></i></div>
+      <div id="p-water" class="sub">—</div>
     </aside>
 
     <main>
@@ -35,30 +43,38 @@
     </main>
 
     <aside id="right" class="panel">
-      <h2>Speed (last answer)</h2>
-      <dl>
-        <dt>You stop → he speaks</dt><dd id="m-total">—</dd>
-        <dt>· waiting for your pause</dt><dd id="m-pause">—</dd>
-        <dt>· brain</dt><dd id="m-brain">—</dd>
-        <dt>· voice</dt><dd id="m-voice">—</dd>
-        <dt>Tokens in / out</dt><dd id="m-tokens">—</dd>
-        <dt>Cached</dt><dd id="m-cache">—</dd>
-        <dt>Brain cost this month</dt><dd id="m-spend">—</dd>
-      </dl>
-      <p class="note">Calendar, tasks and memory arrive in phase 1.</p>
+      <h2>Reactor</h2>
+      <div class="reactor"><div class="ring"><div class="core"></div></div><div id="reactor-label">Standing by</div></div>
+      <h3>Log</h3>
+      <ol id="p-log" class="list log"><li class="empty">Nothing yet.</li></ol>
+      <details class="diag">
+        <summary>Diagnostics</summary>
+        <dl>
+          <dt>Brain</dt><dd id="d-model">—</dd>
+          <dt>Voice</dt><dd id="d-voice">—</dd>
+          <dt>Mode</dt><dd id="d-mode">—</dd>
+          <dt>You stop → he speaks</dt><dd id="m-total">—</dd>
+          <dt>· pause</dt><dd id="m-pause">—</dd>
+          <dt>· brain</dt><dd id="m-brain">—</dd>
+          <dt>· voice</dt><dd id="m-voice">—</dd>
+          <dt>Tokens in / out</dt><dd id="m-tokens">—</dd>
+          <dt>Cached</dt><dd id="m-cache">—</dd>
+        </dl>
+      </details>
     </aside>
 
     <footer>
-      <button id="wake-toggle" class="chip" aria-pressed="false">“Hey Jarvis” off</button>
-      <button id="notify-btn" class="chip" hidden>Turn on reminders</button>
+      <button id="wake-toggle" class="chip" aria-pressed="false">Mic off</button>
+      <button id="notify-btn" class="chip warn" hidden>Turn on reminders</button>
       <form id="type-form" autocomplete="off">
-        <input id="type-input" placeholder="Type instead…" maxlength="500">
+        <input id="type-input" placeholder="Speak, or type here…" maxlength="500">
       </form>
     </footer>
   </div>
 
   <div id="boot" role="button" tabindex="0">
     <div class="boot-inner">
+      <div class="boot-ring"></div>
       <div class="boot-title">J.A.R.V.I.S.</div>
       <div class="boot-sub">Tap to wake</div>
     </div>

@@ -62,6 +62,20 @@ async def _small_json(request: Request) -> dict:
         raise HTTPException(400, "invalid JSON")
 
 
+@app.get("/api/dashboard")
+async def dashboard():
+    """Everything the HUD panels show, straight from the database."""
+    def build():
+        from . import spend, tools
+        rem = tools.list_reminders()["reminders"][:6]
+        overdue = [r for r in tools.routines_status()["routines"] if r["overdue"]]
+        hidden = {"backup", "time zone", "nudges"}
+        act = [a for a in tools.recent_activity(72)["activity"] if a["action"] not in hidden][:8]
+        return {"reminders": rem, "overdue": overdue, "water": tools.water_status(), "activity": act,
+                "month_usd": round(spend.month_to_date(), 2)}
+    return await asyncio.to_thread(build)
+
+
 @app.get("/api/push/key")
 async def push_key():
     return {"key": await asyncio.to_thread(push.public_key)}
@@ -80,6 +94,8 @@ async def push_subscribe(request: Request):
 @app.post("/api/timezone")
 async def set_timezone(request: Request):
     tz = str((await _small_json(request)).get("tz", ""))
+    if tz in ("UTC", "Etc/UTC", "GMT"):
+        return {"ok": True, "ignored": "device reports UTC; keeping the saved time zone"}
     try:
         ZoneInfo(tz)
     except Exception:
