@@ -95,6 +95,15 @@ def push_ready():
     return ("pass", f"{n} phone(s) signed up") if n else ("warn", "server ready; no phone has turned on reminders yet")
 
 
+def backups_ok():
+    b = json.loads(req("/api/health")[2]).get("backup", {})
+    if not b.get("last"):
+        return "fail", "no backup has run yet"
+    if not b.get("offsite_configured"):
+        return "warn", f"server copy only ({b['local_copies']} kept); off-server copy not set up yet"
+    return ("pass", f"last {b['last']}, off-server copy ok") if b.get("offsite") else ("fail", "off-server copy failed")
+
+
 def brain_answers():
     h = json.loads(req("/api/health")[2])
     code, _, body = req("/api/chat", {"text": "Preflight: reply with one short sentence.", "session": "preflight"}, timeout=120)
@@ -118,6 +127,7 @@ check("Security headers present", security_headers)
 check("Oversized requests refused", oversized_refused)
 check("Voice: text becomes processed audio", voice_works)
 check("Notifications: server keys ready, phones signed up", push_ready)
+check("Backups: nightly snapshot exists (and off-server copy)", backups_ok)
 check("Brain: real question gets a real streamed answer", brain_answers)
 
 p, f, w = results.count("pass"), results.count("fail"), results.count("warn")

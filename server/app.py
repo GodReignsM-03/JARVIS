@@ -8,7 +8,7 @@ from fastapi.responses import FileResponse, JSONResponse, Response, StreamingRes
 
 from zoneinfo import ZoneInfo
 
-from . import brain, config, db, push, scheduler, voice
+from . import backup, brain, config, db, push, scheduler, voice
 
 app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
 
@@ -48,6 +48,7 @@ async def health():
         "notification_devices": push.count(),
         "safe_mode": brain._safe_mode,
         "last_error": brain.last_error,
+        "backup": backup.status(),
     }
 
 
